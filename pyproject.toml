@@ -1,0 +1,15 @@
+[project]
+name = "indoor-climbing-gym-hold-classification"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "kagglehub>=0.3.13",
+    "matplotlib>=3.10.8",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+]
