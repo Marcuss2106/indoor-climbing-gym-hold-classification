@@ -1,18 +1,31 @@
 import math
-from pathlib import Path
-from PIL import Image
 import kagglehub
 import numpy as np
 import shutil
 import sys
 import glob
 import os
+import shutil
 
-# -----------------------
-# Helpers
-# -----------------------
+from pathlib import Path
+from PIL import Image
+
+
 def clamp(val, low, high):
     return max(low, min(high, val))
+
+def clear_directory(dir_path: Path):
+	"""Delete all files in the given directory. Replace images and labels subfolders."""
+	if dir_path.exists() and dir_path.is_dir():
+		for item in dir_path.iterdir():
+			if item.is_file():
+				item.unlink()
+			elif item.is_dir():
+				shutil.rmtree(item)
+        # Re-create subdirectories
+	dir_path.mkdir(exist_ok=True)
+	(dir_path / "images").mkdir(parents=True, exist_ok=True)
+	(dir_path / "labels").mkdir(parents=True, exist_ok=True)
 
 def resize_with_padding(img: Image.Image, size: int, fill_rgb=(255,255,255)):
     """Resize while preserving aspect ratio so the longest side == size,
@@ -127,72 +140,16 @@ def compute_mean_std_from_folder(images_dir: Path, image_ext="jpg"):
     mean = sums / count
     var = (sums_sq / count) - (mean ** 2)
     std = np.sqrt(np.maximum(var, 1e-12))
-    return mean.tolist(), std.tolist()
+    return mean.tolist(), std.tolist(), count
 
 
-# Example usage:
-if __name__ == "__main__":
-	os.environ["KAGGLEHUB_CACHE"] = str(Path.cwd())
-	path = kagglehub.dataset_download("diegospaziani/indoor-climbing-gym-hold-classification-dataset")
-	# print("Processing training set from Raw Dataset...")
-	# split_yolo_annotations_to_crops(
-    #     annotations_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Raw_Dataset/train/labels",
-    #     images_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Raw_Dataset/train/images",
-    #     out_images_dir="Processed_Dataset/train/images",
-    #     out_labels_dir="Processed_Dataset/train/labels",
-    #     pad=0.1,
-    #     image_ext=".jpg",
-    # )
-	# print("Processing test set from Raw Dataset...")
-	# split_yolo_annotations_to_crops(
-    #     annotations_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Raw_Dataset/test/labels",
-    #     images_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Raw_Dataset/test/images",
-    #     out_images_dir="Processed_Dataset/test/images",
-    #     out_labels_dir="Processed_Dataset/test/labels",
-    #     pad=0.1,
-    #     image_ext=".jpg",
-    # )
-	# print("Processing training set from Synthetic Dataset...")
-	# split_yolo_annotations_to_crops(
-	# 	annotations_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Synthetic_Dataset/train/labels",
-	# 	images_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Synthetic_Dataset/train/images",
-	# 	out_images_dir="Processed_Dataset/train/images",
-	# 	out_labels_dir="Processed_Dataset/train/labels",
-	# 	pad=0.1,
-	# 	image_ext=".jpg",
-	# )
-	# print("Processing test set from Synthetic Dataset...")
-	# split_yolo_annotations_to_crops(
-	# 	annotations_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Synthetic_Dataset/test/labels",
-	# 	images_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Synthetic_Dataset/test/images",
-	# 	out_images_dir="Processed_Dataset/test/images",
-	# 	out_labels_dir="Processed_Dataset/test/labels",
-	# 	pad=0.1,
-	# 	image_ext=".jpg",
-	# )
-	# print("Processing training set from Final Dataset...")
-	# split_yolo_annotations_to_crops(
-	# 	annotations_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Final_Dataset/train/labels",
-	# 	images_dir="datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Final_Dataset/train/images",
-	# 	out_images_dir="Processed_Dataset/train/images",
-	# 	out_labels_dir="Processed_Dataset/train/labels",
-	# 	pad=0.1,
-	# 	image_ext=".jpg",
-	# )
-    
-	resize = 128
-	datasets_dir = Path("datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/")
-	processed_dir = Path("Processed_Dataset/")
-	temp_dir = Path("temp_processing/")
-	processed_dir.mkdir(exist_ok=True)
-	temp_dir.mkdir(exist_ok=True)
-	ann_files = sorted([p for p in (datasets_dir / "Final_Dataset/test/labels").iterdir() if p.suffix == ".txt"])
-	print("Processing test set from Final Dataset...")
+def calculate_mean_and_std(dataset_dir: Path, temp_dir: Path, resize: int):
+	ann_files = sorted([p for p in (dataset_dir / "labels").iterdir() if p.suffix == ".txt"])
 	total_saved = 0
 	for ann in ann_files:
 		total_saved += crop_and_save_from_ann(
 			ann,
-			datasets_dir / "Final_Dataset/test/images",
+			dataset_dir / "images",
 			temp_dir / "images",
 			temp_dir / "labels",
 			pad_fraction=0.1,
@@ -201,33 +158,155 @@ if __name__ == "__main__":
 			image_ext=".jpg",
 			write_labels=False,   # label content not used for mean/std
         )
-	print(f"PASS 1 done — saved {total_saved} crops to {temp_dir}")
-    # ----------------
-    # Compute mean & std from PASS1 images
-    # ----------------
-	print("Computing dataset mean/std from pass1 images...")
-	mean, std = compute_mean_std_from_folder(temp_dir / "images", image_ext=".jpg")
-	mean_rgb_int = tuple(int(round(m * 255)) for m in mean)
+	print(f"Saved {total_saved} crops from {dataset_dir} to {temp_dir}")
+	print(f"Computing dataset mean/std from {dataset_dir} images...")
+	mean, std, count = compute_mean_std_from_folder(temp_dir / "images", image_ext="jpg")
+	print(f"Clearing temporary directory {temp_dir}...")
+	clear_directory(temp_dir)
 	print(f"Computed mean (float 0..1): {mean}")
 	print(f"Computed std  (float 0..1): {std}")
-	print(f"Use mean color (integers) for padding: {mean_rgb_int}")
+	return mean, std, count
 
-    # ----------------
-    # PASS 2: crop + resize + pad with dataset mean -> final outputs
-    # ----------------
-	print("PASS 2: creating final images padded with dataset mean ...")
-	total_saved2 = 0
+def combine_mean_std(mean1, std1, n1, mean2, std2, n2):
+	"""Combine two datasets' mean/std into overall mean/std."""
+	mean1 = np.array(mean1)
+	std1 = np.array(std1)
+	mean2 = np.array(mean2)
+	std2 = np.array(std2)
+
+	overall_n = n1 + n2
+	overall_mean = (mean1 * n1 + mean2 * n2) / overall_n
+
+	var1 = std1 ** 2
+	var2 = std2 ** 2
+
+	overall_var = (
+		(var1 + (mean1 - overall_mean) ** 2) * n1 +
+		(var2 + (mean2 - overall_mean) ** 2) * n2
+	) / overall_n
+
+	overall_std = np.sqrt(overall_var)
+	return overall_mean.tolist(), overall_std.tolist()
+
+def pad_dataset(dataset_dir: Path, processed_dir: Path, resize: int, mean_rgb_int):
+	ann_files = sorted([p for p in (dataset_dir / "labels").iterdir() if p.suffix == ".txt"])
+	total_saved = 0
 	for ann in ann_files:
-		total_saved2 += crop_and_save_from_ann(
+		total_saved += crop_and_save_from_ann(
             ann,
-            datasets_dir / "Final_Dataset/test/images",
-            processed_dir / "test/images",
-            processed_dir / "test/labels",
+            dataset_dir / "images",
+            processed_dir / "images",
+            processed_dir / "labels",
             pad_fraction=0.1,
             tmp_fill_rgb=mean_rgb_int,
             output_size=resize,
             image_ext=".jpg",
             write_labels=True,
         )
-	print(f"PASS 2 done — saved {total_saved2} final crops to {processed_dir / 'test/images'}")
-	print("Done processing.")
+	print(f"Saved {total_saved} crops to {processed_dir / 'images'}")
+     
+
+# Example usage:
+if __name__ == "__main__":
+	os.environ["KAGGLEHUB_CACHE"] = str(Path.cwd())
+	path = kagglehub.dataset_download("diegospaziani/indoor-climbing-gym-hold-classification-dataset")
+
+	resize = 128
+	datasets_dir = Path("datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/")
+	processed_dir = Path("Processed_Dataset/")
+	temp_dir = Path("temp_processing/")
+	processed_dir.mkdir(exist_ok=True)
+	temp_dir.mkdir(exist_ok=True)
+	(processed_dir / "train/images").mkdir(parents=True, exist_ok=True)
+	(processed_dir / "train/labels").mkdir(parents=True, exist_ok=True)
+	(processed_dir / "test/images").mkdir(parents=True, exist_ok=True)
+	(processed_dir / "test/labels").mkdir(parents=True, exist_ok=True)
+	(processed_dir / "valid/images").mkdir(parents=True, exist_ok=True)
+	(processed_dir / "valid/labels").mkdir(parents=True, exist_ok=True)
+	(temp_dir / "images").mkdir(parents=True, exist_ok=True)
+	(temp_dir / "labels").mkdir(parents=True, exist_ok=True)
+      
+	mean = [0.6681055533042859, 0.6137803857704651, 0.5396168694315177]
+	mean_rgb_int = tuple(int(round(m * 255)) for m in mean)
+	print(f"Mean RGB (int 0..255): {mean_rgb_int}")
+    
+	print("Padding Raw_dataset...")
+	pad_dataset(
+		datasets_dir / "Raw_dataset" / "train",
+		processed_dir / "train",
+		resize,
+		mean_rgb_int)
+	pad_dataset(
+		datasets_dir / "Raw_dataset" / "test",
+		processed_dir / "test",
+		resize,
+		mean_rgb_int)
+      
+	print("Padding Synthetic_dataset...")
+	pad_dataset(
+		datasets_dir / "Synthetic_dataset" / "train",
+		processed_dir / "train",
+		resize,
+		mean_rgb_int)
+	pad_dataset(
+		datasets_dir / "Synthetic_dataset" / "test",
+		processed_dir / "test",
+		resize,
+		mean_rgb_int)
+      
+	print("Padding Final_dataset...")
+	pad_dataset(
+		datasets_dir / "Final_dataset" / "train",
+		processed_dir / "train",
+		resize,
+		mean_rgb_int)
+	pad_dataset(
+		dataset_dir=datasets_dir / "Final_dataset" / "test",
+		processed_dir=processed_dir / "test",
+		resize=resize,
+		mean_rgb_int=mean_rgb_int)
+    
+	print("Padding Validation sets")
+	pad_dataset(
+		datasets_dir / "Raw_dataset" / "valid",
+		processed_dir / "valid",
+		resize,
+		mean_rgb_int)
+	pad_dataset(
+		datasets_dir / "Synthetic_dataset" / "valid",
+		processed_dir / "valid",
+		resize,
+		mean_rgb_int)
+	pad_dataset(
+		datasets_dir / "Final_dataset" / "valid",
+		processed_dir / "valid",
+		resize,
+		mean_rgb_int)
+      
+	print("Calculating means and stds for datasets...")
+	raw_mean, raw_std, raw_count = calculate_mean_and_std(
+		datasets_dir / "Raw_dataset" / "train",
+		temp_dir,
+		resize)
+     
+	synthetic_mean, synthetic_std, synthetic_count = calculate_mean_and_std(
+		datasets_dir / "Synthetic_dataset" / "train",
+		temp_dir,
+		resize)
+
+	final_mean, final_std, final_count = calculate_mean_and_std(
+		datasets_dir / "Final_dataset" / "train",
+		temp_dir,
+        resize)
+     
+	mean, std = combine_mean_std(
+		raw_mean, raw_std, raw_count,
+		synthetic_mean, synthetic_std, synthetic_count)
+	mean, std = combine_mean_std(
+		mean, std, raw_count + synthetic_count,
+		final_mean, final_std, final_count)
+     
+	print(f"Overall combined mean (float 0..1): {mean}")
+	print(f"Overall combined std  (float 0..1): {std}")
+	mean_rgb_int = tuple(int(round(m * 255)) for m in mean)
+	print(f"Mean RGB (int 0..255): {mean_rgb_int}")
