@@ -1,4 +1,4 @@
-### Indoor Climbing Hold Classification
+# Indoor Climbing Hold Classification
 
 This project trains a convolutional neural network (CNN) to classify indoor climbing hold types from images from this dataset:
 
