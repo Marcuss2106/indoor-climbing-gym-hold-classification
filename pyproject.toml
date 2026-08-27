@@ -1,14 +1,18 @@
 [project]
 name = "indoor-climbing-gym-hold-classification"
 version = "0.1.0"
-description = "Add your description here"
+description = "Classify and detect indoor climbing holds (CNN on crops, YOLOv11 on full walls)"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "kagglehub>=0.3.13",
     "matplotlib>=3.10.8",
+    "pillow>=11.0.0",
     "scikit-learn>=1.8.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
     "tqdm>=4.67.1",
+    "ultralytics>=8.3.249",
 ]
 
 [dependency-groups]

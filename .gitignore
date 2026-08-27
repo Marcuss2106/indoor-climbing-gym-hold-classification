@@ -12,3 +12,9 @@ wheels/
 datasets/
 Processed_Dataset/
 temp_processing/
+checkpoints/
+
+# Extra YOLO runs. Keep the checked-in training run; ignore predict dumps and retrains.
+runs/detect/*
+!runs/detect/yolov11s-climbing-gym/
+!runs/detect/yolov11s-climbing-gym/**

@@ -1,14 +1,12 @@
 import math
-import kagglehub
 import numpy as np
 import shutil
 import sys
-import glob
-import os
-import shutil
 
 from pathlib import Path
 from PIL import Image
+
+from download_dataset import download_dataset, named_dir
 
 
 def clamp(val, low, high):
@@ -208,11 +206,9 @@ def pad_dataset(dataset_dir: Path, processed_dir: Path, resize: int, mean_rgb_in
 
 # Example usage:
 if __name__ == "__main__":
-	os.environ["KAGGLEHUB_CACHE"] = str(Path.cwd())
-	path = kagglehub.dataset_download("diegospaziani/indoor-climbing-gym-hold-classification-dataset")
+	datasets_dir = download_dataset()
 
 	resize = 128
-	datasets_dir = Path("datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/")
 	processed_dir = Path("Processed_Dataset/")
 	temp_dir = Path("temp_processing/")
 	processed_dir.mkdir(exist_ok=True)
@@ -230,72 +226,76 @@ if __name__ == "__main__":
 	mean_rgb_int = tuple(int(round(m * 255)) for m in mean)
 	print(f"Mean RGB (int 0..255): {mean_rgb_int}")
     
+	raw_dir = named_dir(datasets_dir, "Raw_dataset")
+	synthetic_dir = named_dir(datasets_dir, "Synthetic_dataset")
+	final_dir = named_dir(datasets_dir, "Final_Dataset")
+
 	print("Padding Raw_dataset...")
 	pad_dataset(
-		datasets_dir / "Raw_dataset" / "train",
+		raw_dir / "train",
 		processed_dir / "train",
 		resize,
 		mean_rgb_int)
 	pad_dataset(
-		datasets_dir / "Raw_dataset" / "test",
+		raw_dir / "test",
 		processed_dir / "test",
 		resize,
 		mean_rgb_int)
       
 	print("Padding Synthetic_dataset...")
 	pad_dataset(
-		datasets_dir / "Synthetic_dataset" / "train",
+		synthetic_dir / "train",
 		processed_dir / "train",
 		resize,
 		mean_rgb_int)
 	pad_dataset(
-		datasets_dir / "Synthetic_dataset" / "test",
+		synthetic_dir / "test",
 		processed_dir / "test",
 		resize,
 		mean_rgb_int)
       
-	print("Padding Final_dataset...")
+	print("Padding Final_Dataset...")
 	pad_dataset(
-		datasets_dir / "Final_dataset" / "train",
+		final_dir / "train",
 		processed_dir / "train",
 		resize,
 		mean_rgb_int)
 	pad_dataset(
-		dataset_dir=datasets_dir / "Final_dataset" / "test",
+		dataset_dir=final_dir / "test",
 		processed_dir=processed_dir / "test",
 		resize=resize,
 		mean_rgb_int=mean_rgb_int)
     
 	print("Padding Validation sets")
 	pad_dataset(
-		datasets_dir / "Raw_dataset" / "valid",
+		raw_dir / "valid",
 		processed_dir / "valid",
 		resize,
 		mean_rgb_int)
 	pad_dataset(
-		datasets_dir / "Synthetic_dataset" / "valid",
+		synthetic_dir / "valid",
 		processed_dir / "valid",
 		resize,
 		mean_rgb_int)
 	pad_dataset(
-		datasets_dir / "Final_dataset" / "valid",
+		final_dir / "valid",
 		processed_dir / "valid",
 		resize,
 		mean_rgb_int)
       
 	print("Calculating means and stds for datasets...")
 	raw_mean, raw_std, raw_count = calculate_mean_and_std(
-		datasets_dir / "Raw_dataset" / "train",
+		raw_dir / "train",
 		temp_dir,
 		resize)
      
 	synthetic_mean, synthetic_std, synthetic_count = calculate_mean_and_std(
-		datasets_dir / "Synthetic_dataset" / "train",
+		synthetic_dir / "train",
 		temp_dir,
 		resize)
 
 	final_mean, final_std, final_count = calculate_mean_and_std(
-		datasets_dir / "Final_dataset" / "train",
+		final_dir / "train",
 		temp_dir,
         resize)
      

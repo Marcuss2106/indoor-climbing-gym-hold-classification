@@ -1,0 +1,15 @@
+# Relative to the repo root. train_yolo.py downloads the dataset and replaces
+# `path` with the real folder (case-insensitive), so this also works on Linux
+# if Kaggle uses Final_dataset instead of Final_Dataset.
+path: datasets/diegospaziani/indoor-climbing-gym-hold-classification-dataset/versions/3/Final_Dataset
+train: train/images
+val: valid/images
+
+nc: 6
+names:
+  0: Crimp
+  1: Jug
+  2: Pinch
+  3: Pocket
+  4: Slope
+  5: Volume
